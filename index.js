@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const { ApolloServer } = require('apollo-server')
 const { PubSub } = require('apollo-server')
 const sqlite3 = require('sqlite3').verbose()

@@ -10,7 +10,7 @@ module.exports = {
 		async messages(_, { username }, { req, db }) {
 			let user = JSON.parse(req.headers.user)
 			let rows = await new Promise((res, rej) => db.all(
-				'SELECT * FROM messages WHERE users = ? OR users = ?', 
+				'SELECT * FROM messages WHERE users = ? OR users = ? ORDER BY id DESC', 
 				[`${username}|${user.username}`,`${user.username}|${username}`], 
 				(err, rows) => {
 					if (err) rej(err)

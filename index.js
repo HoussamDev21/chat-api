@@ -5,43 +5,43 @@ const { PubSub } = require('apollo-server')
 const sqlite3 = require('sqlite3').verbose()
 const typeDefs = require('./typeDefs')
 const resolvers = require('./resolvers')
-const users = require('./users')
+const User = require('./models/User')
 
 const pubsub = new PubSub()
-const db = new sqlite3.Database('./messages.db', (err) => {
+const db = new sqlite3.Database('./chat.db', (err) => {
     if (err) {
         return console.error(err.message)
     }
     console.log('connected to database')
 })
 
-db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY,
-        users TEXT,
-        content TEXT 
-    )
-`)
-
 const server = new ApolloServer({
     typeDefs,
     resolvers,
-    context: async (ctx) => ({ ... ctx, pubsub, db }),
+    context: async (ctx) => {
+        if (ctx.req) {
+            let token = ctx.req.headers.token
+            let user = await User.getUserByToken({ token, db })
+            return { ... ctx, pubsub, db, user }
+        } else if (ctx.connection) {
+            return { ... ctx, pubsub, db, user: ctx.connection.context.user }
+        }
+    },
     subscriptions: {
         path: '/ws',
-        onConnect: (connectionParams) => {
-            let user = JSON.parse(connectionParams.user)
-            if (user) {
-                users.join({ pubsub }, user)
-                return { user }
+        onConnect: async (connectionParams) => {
+            let token = connectionParams.token
+            if (token) {
+                User.updateUserStatus({ token, db, value: 1 })
+                return { token }
             }
             return {}
         },
         onDisconnect: async (_, { initPromise }) => {
             const initialContext = await initPromise
-            let user = initialContext.user
-            if (user) {
-                users.left({ pubsub }, user)
+            let token = initialContext.token
+            if (token) {
+                User.updateUserStatus({ token, db, value: -1 })
             }
         },
     },

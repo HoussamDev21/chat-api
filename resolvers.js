@@ -1,54 +1,65 @@
 const { withFilter } = require('apollo-server')
-const users = require('./users')
+
+const User = require('./models/User')
+const Conversation = require('./models/Conversation')
+const Message = require('./models/Message')
 
 module.exports = {
 	Query: {
-		onlineUsers(_, __, { req }) {
-			let user = JSON.parse(req.headers.user)
-			return users.list.filter(u => u.username !== user.username)
+
+		async onlineUsers(_, __, { user, db }) {
+			return (await User.onlineUsers({ db })).filter(u => u.id != user.id)
 		},
-		async messages(_, { username }, { req, db }) {
-			let user = JSON.parse(req.headers.user)
-			let rows = await new Promise((res, rej) => db.all(
-				'SELECT * FROM messages WHERE users = ? OR users = ? ORDER BY id DESC', 
-				[`${username}|${user.username}`,`${user.username}|${username}`], 
-				(err, rows) => {
-					if (err) rej(err)
-					else res(rows)
-				}
-			))
-			let messages = rows.map(item => {
-				return {
-					content: item.content,
-					sender: { username: item.users.split('|')[0] },
-					receiver: { username: item.users.split('|')[1] },
-				}
-			})
-			return messages
+
+		async me(_, __, { user }) {
+			if (!user) return null
+			return user
 		},
+
+		async conversations(_, __, { user, db }) {
+			return await Conversation.userConversations({ user, db })
+		},
+
+		async messages(_, { conversation_id }, { user, db }) {
+			return await Message.messages({ conversation_id, user, db })
+		},
+
+		async conversation(_, { user_id }, { db, user }) {
+			return await Conversation.startConversationWithUser({ user_id, db, user })
+		},
+
 	},
     Mutation: {
-		sendMessage(_, { content, receiver }, { req, pubsub, db }) {
-			let user = JSON.parse(req.headers.user)
-			let message = { content, sender: user, receiver: { username: receiver }}
-			db.run('INSERT INTO messages (content,users) VALUES (?,?)', [content, `${user.username}|${receiver}`])
-			pubsub.publish('NEW_MESSAGE', { newMessage: message })
-			return message
-		}
+
+		async authentication(_, { input }, { db }) {
+			return await User.authentication({ input, db })
+		},
+
+		async logout(_, __, { db, req }) {
+			await User.logout({ db, token: req.headers.token })
+		},
+
+		async sendMessage(_, { content, conversation_id }, { pubsub, db, user }) {
+			let newMessage = Message.createMessage({ content, conversation_id, db, user })
+			pubsub.publish('NEW_MESSAGE', { newMessage, conversation_id })
+			return newMessage
+		},
+
 	},
 	Subscription: {
+
 		onlineUsers: {
 		  	subscribe: (_, __, { pubsub }) => pubsub.asyncIterator('ONLINE_USERS')
 		},
+
 		newMessage: {
 			subscribe: withFilter(
 				(_, __, { pubsub }) => pubsub.asyncIterator('NEW_MESSAGE'),
-				({ newMessage }, { participants }) => {
-					let condition = participants.includes(newMessage.sender.username)
-					&& participants.includes(newMessage.receiver.username)
-					return condition
+				({ conversation_id: c_id_1 }, { conversation_id: c_id_2 }) => {
+					return c_id_1 === c_id_2
 				},
 			)
 		},
+		
 	}
 }

@@ -70,7 +70,7 @@ module.exports = {
             await new Promise((resolve, reject) => db.run(
                 `UPDATE users SET status = $status, status_time = CURRENT_TIMESTAMP WHERE id = $id`,
                 {
-                    $status: user.status, 
+                    $status: user.status,
                     $id: user.id
                 },
                 (error) => {
@@ -78,6 +78,7 @@ module.exports = {
                     resolve(true)
                 }
             ))
+            return user
         }
     },
     onlineUsers({ db }) {

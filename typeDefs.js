@@ -14,12 +14,14 @@ module.exports = gql`
         content: String
         created_at: String
         user: User
+        user_id: ID
     }
 
     type Conversation {
         id: ID
         created_at: String
         participants: [User]
+        lastMessage: Message
     }
 
     input AuthenticationInput {
@@ -48,7 +50,8 @@ module.exports = gql`
     }
 
     type Subscription {
-        onlineUsers: [User]
+        userConnected: User
+        userDisconnected: User
         newMessage(conversation_id: ID!): Message
     }
 

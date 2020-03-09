@@ -10,5 +10,8 @@
     "graphql": "^14.6.0",
     "jsonwebtoken": "^8.5.1",
     "sqlite3": "^4.1.1"
+  },
+  "scripts": {
+    "prod": "pm2 start 'PORT=4000 node index' --name=chat-api"
   }
 }

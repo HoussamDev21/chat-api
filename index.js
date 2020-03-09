@@ -24,7 +24,9 @@ const server = new ApolloServer({
             let user = await User.getUserByToken({ token, db })
             return { ... ctx, pubsub, db, user }
         } else if (ctx.connection) {
-            return { ... ctx, pubsub, db, user: ctx.connection.context.user }
+            let token = ctx.connection.context.token
+            let user = await User.getUserByToken({ token, db })
+            return { ... ctx, pubsub, db, user }
         }
     },
     subscriptions: {
@@ -32,7 +34,8 @@ const server = new ApolloServer({
         onConnect: async (connectionParams) => {
             let token = connectionParams.token
             if (token) {
-                User.updateUserStatus({ token, db, value: 1 })
+                let user = await User.updateUserStatus({ token, db, value: 1 })
+                pubsub.publish('USER_CONNECTED', { userConnected: user })
                 return { token }
             }
             return {}
@@ -41,7 +44,10 @@ const server = new ApolloServer({
             const initialContext = await initPromise
             let token = initialContext.token
             if (token) {
-                User.updateUserStatus({ token, db, value: -1 })
+                let user = await User.updateUserStatus({ token, db, value: -1 })
+                if (user && user.status === 0) {
+                    pubsub.publish('USER_DISCONNECTED', { userDisconnected: user })
+                }
             }
         },
     },

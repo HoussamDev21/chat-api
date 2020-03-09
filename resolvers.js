@@ -48,10 +48,24 @@ module.exports = {
 	},
 	Subscription: {
 
-		onlineUsers: {
-		  	subscribe: (_, __, { pubsub }) => pubsub.asyncIterator('ONLINE_USERS')
+		userConnected: {
+			subscribe: withFilter(
+				(_, __, { pubsub }) => pubsub.asyncIterator('USER_CONNECTED'),
+				({ userConnected }, __, { user }) => {
+					return userConnected.id !== user.id
+				}
+			)
 		},
 
+		userDisconnected: {
+			subscribe: withFilter(
+				(_, __, { pubsub }) => pubsub.asyncIterator('USER_DISCONNECTED'),
+				({ userDisconnected }, __, { user }) => {
+					return userDisconnected.id !== user.id
+				}
+			)
+		},
+		
 		newMessage: {
 			subscribe: withFilter(
 				(_, __, { pubsub }) => pubsub.asyncIterator('NEW_MESSAGE'),

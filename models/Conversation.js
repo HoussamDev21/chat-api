@@ -1,12 +1,22 @@
 module.exports = {
     async userConversations({ user, db }) {
         let rows = await new Promise((resolve, reject) => db.all(
-            `SELECT 
+            `SELECT * FROM (SELECT 
                 conversation_id AS id,
-                conversations.created_at
-            FROM participations JOIN conversations 
-            ON participations.conversation_id = conversations.id 
-            WHERE participations.user_id = ?`, 
+                conversations.created_at,
+                MAX(message_participation.created_at) AS message_created_at,
+                message_participation.message_id,
+                messages.content AS message_content,
+                messages.user_id AS message_user_id
+            FROM participations 
+            JOIN conversations 
+                ON participations.conversation_id = conversations.id
+            JOIN message_participation
+                ON message_participation.participation_id = participations.id
+            JOIN messages
+                ON messages.id = message_id
+            WHERE participations.user_id = ?)
+            WHERE id NOTNULL`, 
             [user.id],
             (error, rows) => {
                 if (error) reject(error)
@@ -35,8 +45,15 @@ module.exports = {
                 .map((p) => ({
                     id: p.id,
                     username: p.username
-                }))
+                })),
+            lastMessage: {
+                id: c.message_id,
+                content: c.message_content,
+                created_at: c.message_created_at,
+                user_id: c.message_user_id,
+            }
         }))
+        console.log(rows)
         return conversations
     },
     async startConversationWithUser({ user_id, user, db }) {

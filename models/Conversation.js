@@ -53,7 +53,6 @@ module.exports = {
                 user_id: c.message_user_id,
             }
         }))
-        console.log(rows)
         return conversations
     },
     async startConversationWithUser({ user_id, user, db }) {

@@ -30,7 +30,7 @@ const server = new ApolloServer({
         }
     },
     subscriptions: {
-        path: '/ws',
+        path: '/',
         onConnect: async (connectionParams) => {
             let token = connectionParams.token
             if (token) {

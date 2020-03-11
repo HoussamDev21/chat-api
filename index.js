@@ -1,7 +1,6 @@
 require('dotenv').config()
 
-const { ApolloServer } = require('apollo-server')
-const { PubSub } = require('apollo-server')
+const { ApolloServer, PubSub } = require('apollo-server')
 const sqlite3 = require('sqlite3').verbose()
 const typeDefs = require('./typeDefs')
 const resolvers = require('./resolvers')
@@ -30,7 +29,7 @@ const server = new ApolloServer({
         }
     },
     subscriptions: {
-        path: '/',
+        path: '/ws',
         onConnect: async (connectionParams) => {
             let token = connectionParams.token
             if (token) {
@@ -53,7 +52,9 @@ const server = new ApolloServer({
     },
 })
 
-server.listen(process.env.PORT || 4000).then(({ url, subscriptionsUrl }) => {
+server.listen({
+    port: process.env.PORT || 4000
+}).then(({ url, subscriptionsUrl }) => {
     console.log(`Server ready at ${url}`)
     console.log(`Subscriptions ready at ${subscriptionsUrl}`)
 })

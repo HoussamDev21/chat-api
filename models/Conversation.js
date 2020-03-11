@@ -1,25 +1,27 @@
 module.exports = {
     async userConversations({ user, db }) {
         let rows = await new Promise((resolve, reject) => db.all(
-            `SELECT * FROM (SELECT 
-                conversation_id AS id,
-                conversations.created_at,
-                MAX(message_participation.created_at) AS message_created_at,
-                message_participation.message_id,
-                messages.content AS message_content,
-                messages.user_id AS message_user_id
-            FROM participations 
-            JOIN conversations 
-                ON participations.conversation_id = conversations.id
-            JOIN message_participation
-                ON message_participation.participation_id = participations.id
-            JOIN messages
-                ON messages.id = message_id
-            WHERE participations.user_id = ?)
-            WHERE id NOTNULL`, 
-            [user.id],
+            `SELECT * FROM
+                (SELECT
+                    conversations.id AS id,
+                    conversations.created_at AS created_at,
+                    messages.id AS last_message__id,
+                    messages.content AS last_message__content,
+                    messages.created_at AS last_message__created_at,
+                    messages.user_id AS last_message__user_id
+                FROM participations
+                JOIN conversations 			ON participations.conversation_id = conversations.id
+                JOIN message_participation 	ON message_participation.participation_id = participations.id
+                JOIN messages 				ON messages.id = message_participation.message_id
+                WHERE participations.user_id = $user_id
+                ORDER BY messages.created_at DESC) AS result
+            GROUP BY result.id
+            ORDER BY last_message__created_at DESC`, 
+            { $user_id: user.id },
             (error, rows) => {
-                if (error) reject(error)
+                if (error) {
+                    reject(error)
+                }
                 resolve(rows)
             }
         ))
@@ -47,10 +49,10 @@ module.exports = {
                     username: p.username
                 })),
             lastMessage: {
-                id: c.message_id,
-                content: c.message_content,
-                created_at: c.message_created_at,
-                user_id: c.message_user_id,
+                id: c.last_message__id,
+                content: c.last_message__content,
+                created_at: c.last_message__created_at,
+                user_id: c.last_message__user_id,
             }
         }))
         return conversations

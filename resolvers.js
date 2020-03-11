@@ -11,7 +11,7 @@ module.exports = {
 			return (await User.onlineUsers({ db })).filter(u => u.id != user.id)
 		},
 
-		async me(_, __, { user }) {
+		me(_, __, { user }) {
 			if (!user) return null
 			return user
 		},
@@ -40,8 +40,10 @@ module.exports = {
 		},
 
 		async sendMessage(_, { content, conversation_id }, { pubsub, db, user }) {
-			let newMessage = Message.createMessage({ content, conversation_id, db, user })
+			let newMessage = await Message.createMessage({ content, conversation_id, db, user })
+			let conversation = await Conversation.getConversation({ conversation_id, db, user })
 			pubsub.publish('NEW_MESSAGE', { newMessage, conversation_id })
+			pubsub.publish('CONVERSATION', { conversation })
 			return newMessage
 		},
 
@@ -62,6 +64,15 @@ module.exports = {
 				(_, __, { pubsub }) => pubsub.asyncIterator('USER_DISCONNECTED'),
 				({ userDisconnected }, __, { user }) => {
 					return userDisconnected.id !== user.id
+				}
+			)
+		},
+
+		conversation: {
+			subscribe: withFilter(
+				(_, __, { pubsub }) => pubsub.asyncIterator('CONVERSATION'),
+				({ conversation }, __, { user }) => {
+					return conversation.participants.map(p => p.id).includes(user.id)
 				}
 			)
 		},

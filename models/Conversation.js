@@ -1,8 +1,8 @@
 module.exports = {
     async userConversations({ user, db }) {
         let rows = await new Promise((resolve, reject) => db.all(
-            `SELECT * FROM
-                (SELECT
+            `SELECT * FROM (
+                SELECT
                     conversations.id AS id,
                     conversations.created_at AS created_at,
                     messages.id AS last_message__id,
@@ -14,7 +14,8 @@ module.exports = {
                 JOIN message_participation 	ON message_participation.participation_id = participations.id
                 JOIN messages 				ON messages.id = message_participation.message_id
                 WHERE participations.user_id = $user_id
-                ORDER BY messages.created_at DESC) AS result
+                ORDER BY messages.created_at DESC
+            ) AS result
             GROUP BY result.id
             ORDER BY last_message__created_at DESC`, 
             { $user_id: user.id },
@@ -59,7 +60,15 @@ module.exports = {
     },
     async startConversationWithUser({ user_id, user, db }) {
         let row = await new Promise((resolve, reject) => db.get(
-            'SELECT COUNT(*) AS count, conversation_id FROM participations WHERE conversation_id IN (SELECT conversation_id FROM participations WHERE user_id = ?) AND user_id = ?', [user.id, user_id],
+            `SELECT 
+                COUNT(*) AS count, 
+                conversation_id 
+            FROM participations 
+            WHERE conversation_id IN (
+                SELECT conversation_id FROM participations WHERE user_id = ?
+            ) 
+            AND user_id = ?`, 
+            [user.id, user_id],
             (error, row) => {
                 if (error) reject(error)
                 resolve(row)
@@ -81,13 +90,70 @@ module.exports = {
             }
         ))
         let participants = await new Promise((resolve, reject) => db.all(
-            'SELECT users.id, username FROM participations JOIN users ON participations.user_id = users.id WHERE conversation_id = ?', [conversation_id],
+            `SELECT 
+                users.id, 
+                username 
+            FROM participations 
+            JOIN users ON participations.user_id = users.id 
+            WHERE conversation_id = ?`, 
+            [conversation_id],
             (error, row) => {
                 if (error) reject(error)
                 resolve(row)
             }
         ))
         conversation.participants = participants
+        return conversation
+    },
+    async getConversation({ conversation_id, user, db }) {
+        let row = await new Promise((resolve, reject) => db.get(
+            `SELECT
+                conversations.id AS id,
+                conversations.created_at AS created_at,
+                messages.id AS last_message__id,
+                messages.content AS last_message__content,
+                MAX(messages.created_at) AS last_message__created_at,
+                messages.user_id AS last_message__user_id
+            FROM participations
+            JOIN conversations 			ON participations.conversation_id = conversations.id
+            JOIN message_participation 	ON message_participation.participation_id = participations.id
+            JOIN messages 				ON messages.id = message_participation.message_id
+            WHERE participations.user_id = $user_id
+            AND conversations.id = $conversation_id`, 
+            { $user_id: user.id, $conversation_id: conversation_id },
+            (error, row) => {
+                if (error) reject(error)
+                resolve(row)
+            }
+        ))
+        let participants = await new Promise((resolve, reject) => db.all(
+            `SELECT 
+                users.id,
+                users.username,
+                participations.conversation_id 
+            FROM participations 
+            JOIN users ON participations.user_id = users.id 
+            WHERE participations.conversation_id = $conversation_id`, 
+            { $conversation_id: conversation_id },
+            (error, rows) => {
+                if (error) reject(error)
+                resolve(rows)
+            }
+        ))
+        let conversation = {
+            id: row.id,
+            created_at: row.created_at,
+            participants: participants.map((p) => ({
+                id: p.id,
+                username: p.username
+            })),
+            lastMessage: {
+                id: row.last_message__id,
+                content: row.last_message__content,
+                created_at: row.last_message__created_at,
+                user_id: row.last_message__user_id,
+            }
+        }
         return conversation
     }
 }

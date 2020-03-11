@@ -53,6 +53,7 @@ module.exports = gql`
         userConnected: User
         userDisconnected: User
         newMessage(conversation_id: ID!): Message
+        conversation: Conversation
     }
 
     schema {
